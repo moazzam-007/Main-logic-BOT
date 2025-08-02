@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced Affiliate Bot - Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .dashboard-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+        }
+        .stat-card {
+            background: linear-gradient(45deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 10px 0;
+        }
+        .api-endpoint {
+            background: #f8f9fa;
+            border-left: 4px solid #007bff;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .status-online { background: #28a745; color: white; }
+        .status-offline { background: #dc3545; color: white; }
+    </style>
+</head>
+<body>
+    <div class="container mt-5">
+        <div class="row justify-content-center">
+            <div class="col-md-10">
+                <!-- Header -->
+                <div class="dashboard-card p-4 mb-4">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <h1 class="display-4 mb-0">🤖 Enhanced Affiliate Bot</h1>
+                            <p class="lead text-muted">Advanced Amazon Affiliate Link Processing System</p>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <span class="status-badge status-online">🟢 ONLINE</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Statistics -->
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="stat-card text-center">
+                            <h3>{{ stats.processed_links }}</h3>
+                            <p class="mb-0">Processed Links</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="stat-card text-center">
+                            <h3>{{ stats.channels_configured }}</h3>
+                            <p class="mb-0">Channels Configured</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="stat-card text-center">
+                            <h3>{{ stats.affiliate_tag }}</h3>
+                            <p class="mb-0">Affiliate Tag</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- API Information -->
+                <div class="dashboard-card p-4 mb-4">
+                    <h3>📡 API Endpoints</h3>
+                    <div class="api-endpoint">
+                        <h5><span class="badge bg-success">POST</span> /api/process</h5>
+                        <p class="mb-2"><strong>Purpose:</strong> Main endpoint for processing Amazon links</p>
+                        <p class="mb-2"><strong>Payload:</strong></p>
+                        <pre class="bg-light p-2 rounded"><code>{
+  "url": "https://amazon.in/dp/PRODUCT_ID",
+  "original_text": "Original message text",
+  "image_file_id": "telegram_file_id" // optional
+}</code></pre>
+                    </div>
+                    
+                    <div class="api-endpoint">
+                        <h5><span class="badge bg-info">GET</span> /health</h5>
+                        <p class="mb-0"><strong>Purpose:</strong> Health check and service status</p>
+                    </div>
+                    
+                    <div class="api-endpoint">
+                        <h5><span class="badge bg-info">GET</span> /api/stats</h5>
+                        <p class="mb-0"><strong>Purpose:</strong> Get processing statistics</p>
+                    </div>
+                </div>
+
+                <!-- Features -->
+                <div class="dashboard-card p-4 mb-4">
+                    <h3>🚀 Features</h3>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <ul class="list-unstyled">
+                                <li class="mb-2">✅ <strong>Duplicate Detection:</strong> 24-hour window</li>
+                                <li class="mb-2">✅ <strong>Smart Image Handling:</strong> Use existing or scrape</li>
+                                <li class="mb-2">✅ <strong>Multi-Channel Support:</strong> Post to multiple channels</li>
+                                <li class="mb-2">✅ <strong>URL Shortening:</strong> TinyURL integration</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <ul class="list-unstyled">
+                                <li class="mb-2">✅ <strong>Retry Logic:</strong> 3 attempts with fallback</li>
+                                <li class="mb-2">✅ <strong>Error Notifications:</strong> Telegram alerts</li>
+                                <li class="mb-2">✅ <strong>Affiliate Tag Replacement:</strong> Smart processing</li>
+                                <li class="mb-2">✅ <strong>Product Info Extraction:</strong> Title and images</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Configuration Guide -->
+                <div class="dashboard-card p-4 mb-4">
+                    <h3>⚙️ Environment Variables</h3>
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Variable</th>
+                                    <th>Description</th>
+                                    <th>Required</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>TELEGRAM_BOT_TOKEN</code></td>
+                                    <td>Your Telegram bot token</td>
+                                    <td><span class="badge bg-danger">Required</span></td>
+                                </tr>
+                                <tr>
+                                    <td><code>CHANNEL_IDS</code></td>
+                                    <td>Comma-separated channel IDs</td>
+                                    <td><span class="badge bg-danger">Required</span></td>
+                                </tr>
+                                <tr>
+                                    <td><code>AFFILIATE_TAG</code></td>
+                                    <td>Your Amazon affiliate tag</td>
+                                    <td><span class="badge bg-warning">Optional</span></td>
+                                </tr>
+                                <tr>
+                                    <td><code>ERROR_CHAT_ID</code></td>
+                                    <td>Chat ID for error notifications</td>
+                                    <td><span class="badge bg-warning">Optional</span></td>
+                                </tr>
+                                <tr>
+                                    <td><code>TINYURL_API_TOKEN</code></td>
+                                    <td>TinyURL API token (optional)</td>
+                                    <td><span class="badge bg-secondary">Optional</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Footer -->
+                <div class="text-center mt-4">
+                    <p class="text-muted">
+                        Enhanced Affiliate Bot v2.0 | 
+                        <a href="/health" class="text-decoration-none">Health Check</a> | 
+                        <a href="/api/stats" class="text-decoration-none">Statistics</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Auto-refresh stats every 30 seconds
+        setInterval(function() {
+            fetch('/api/stats')
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Stats updated:', data);
+                })
+                .catch(error => console.error('Error fetching stats:', error));
+        }, 30000);
+    </script>
+</body>
+</html>
