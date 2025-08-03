@@ -33,46 +33,50 @@ def process_amazon_link():
             logger.warning("No data received in API request")
             return jsonify({"status": "error", "message": "No data provided"}), 400
 
-        # Validate request data
-        validation_result = validate_request_data(data)
-        if not validation_result['valid']:
-            logger.warning(f"Invalid request data: {validation_result['error']}")
-            return jsonify({"status": "error", "message": validation_result['error']}), 400
-
+        # Extract data from monitor bot
         url = data.get('url')
         original_text = data.get('original_text', '')
-        image_file_id = data.get('image_file_id')
+        images = data.get('images', [])  # ✅ Images from monitor bot
+        channel_info = data.get('channel_info', {})
 
         logger.info(f"🔗 Processing request for URL: {url}")
+        logger.info(f"📸 Images received: {len(images)}")
 
         # Check for duplicates
         if duplicate_detector.is_duplicate(url):
             logger.info(f"⚠️ Duplicate URL detected, skipping: {url}")
             return jsonify({
-                "status": "skipped", 
+                "status": "duplicate", 
                 "message": "Duplicate URL detected",
                 "url": url
             }), 200
+
+        # Mark as processed
+        duplicate_detector.mark_as_processed(url)
 
         # Process with retry logic
         max_retries = 3
         for attempt in range(max_retries):
             try:
                 # Process Amazon link
-                result = amazon_processor.process_link(url, image_file_id)
+                result = amazon_processor.process_link(url)
                 
                 if not result:
                     raise Exception("Failed to process Amazon link")
 
-                # Post to channels
-                posting_result = channel_poster.post_to_channels(result)
+                # Add original text to result
+                result['original_text'] = original_text
+                result['affiliate_link'] = result.get('affiliate_link', url)
+
+                # Post to channels with images
+                posting_result = channel_poster.post_to_channels(result, images)
                 
                 if posting_result['success']:
                     logger.info(f"✅ Successfully processed and posted: {url}")
                     return jsonify({
                         "status": "success",
                         "message": "Link processed and posted successfully",
-                        "url": url,
+                        "url": result.get('affiliate_link', url),
                         "channels_posted": posting_result['posted_channels']
                     }), 200
                 else:
@@ -82,7 +86,8 @@ def process_amazon_link():
                 logger.error(f"❌ Attempt {attempt + 1} failed for {url}: {str(e)}")
                 if attempt == max_retries - 1:
                     # Final attempt failed, notify error
-                    error_notifier.notify_error(url, str(e), original_text)
+                    if hasattr(error_notifier, 'notify_error'):
+                        error_notifier.notify_error(url, str(e), original_text)
                     return jsonify({
                         "status": "error",
                         "message": f"Processing failed after {max_retries} attempts: {str(e)}",
