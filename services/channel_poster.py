@@ -130,7 +130,7 @@ class ChannelPoster:
                 'chat_id': chat_id,
                 'text': text,
                 'parse_mode': 'HTML',
-                'disable_web_page_preview': True  # ✅ Link preview disable
+                'disable_web_page_preview': True  # Link preview disable
             }
             
             response = requests.post(url, json=data, timeout=15)
