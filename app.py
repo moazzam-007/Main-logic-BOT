@@ -1,141 +1,181 @@
-import os
+from flask import Flask, request, jsonify
 import logging
-import json
-from flask import Flask, request, jsonify, render_template
+import os
 from services.amazon_processor import AmazonProcessor
 from services.duplicate_detector import DuplicateDetector
 from services.channel_poster import ChannelPoster
-from services.error_notifier import ErrorNotifier
 from utils.config import Config
-from utils.helpers import validate_request_data
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# Setup logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 # Initialize Flask app
-app = Flask(__name__, template_folder='templates')
+app = Flask(__name__)
 
 # Initialize services
-config = Config()
-amazon_processor = AmazonProcessor(config.AFFILIATE_TAG)
-duplicate_detector = DuplicateDetector()
-channel_poster = ChannelPoster(config.BOT_TOKEN, config.CHANNEL_IDS)
-error_notifier = ErrorNotifier(config.BOT_TOKEN, config.ERROR_CHAT_ID) if hasattr(config, 'ERROR_CHAT_ID') else None
-
-@app.route('/api/process', methods=['POST'])
-def process_amazon_link():
-    """Main API endpoint to process Amazon links from monitor bot"""
-    try:
-        # Get JSON data
-        data = request.get_json()
-        if not data:
-            logger.warning("No data received in API request")
-            return jsonify({"status": "error", "message": "No data provided"}), 400
-
-        # Extract data from monitor bot
-        url = data.get('url')
-        original_text = data.get('original_text', '')
-        images = data.get('images', [])  # Images from monitor bot
-        channel_info = data.get('channel_info', {})
-
-        logger.info(f"🔗 Processing request for URL: {url}")
-        logger.info(f"📸 Images received: {len(images)}")
-
-        # Check for duplicates
-        if duplicate_detector.is_duplicate(url):
-            logger.info(f"⚠️ Duplicate URL detected, skipping: {url}")
-            return jsonify({
-                "status": "duplicate", 
-                "message": "Duplicate URL detected",
-                "url": url
-            }), 200
-
-        # Process with retry logic
-        max_retries = 3
-        for attempt in range(max_retries):
-            try:
-                # Process Amazon link
-                result = amazon_processor.process_link(url)
-                if not result:
-                    raise Exception("Failed to process Amazon link")
-
-                # Create product info for posting
-                product_info = {
-                    'title': result.get('title', 'Amazon Product'),
-                    'price': result.get('price', 'Price not available'),
-                    'affiliate_link': result.get('affiliate_link', url),
-                    'original_text': original_text,
-                    'image_url': result.get('image_url'),
-                    'image_file_id': result.get('image_file_id')
-                }
-
-                # Post to channels with images
-                posting_result = channel_poster.post_to_channels(product_info, images)
-                
-                if posting_result['success']:
-                    logger.info(f"✅ Successfully processed and posted: {url}")
-                    return jsonify({
-                        "status": "success",
-                        "message": "Link processed and posted successfully", 
-                        "url": result.get('affiliate_link', url),
-                        "channels_posted": posting_result['posted_channels']
-                    }), 200
-                else:
-                    raise Exception(f"Failed to post to channels: {posting_result['error']}")
-
-            except Exception as e:
-                logger.error(f"❌ Attempt {attempt+1} failed for {url}: {str(e)}")
-                if attempt == max_retries - 1:
-                    # Final attempt failed, notify error
-                    if error_notifier and hasattr(error_notifier, 'notify_error'):
-                        error_notifier.notify_error(url, str(e), original_text)
-                    
-                    return jsonify({
-                        "status": "error",
-                        "message": f"Processing failed after {max_retries} attempts: {str(e)}",
-                        "url": url
-                    }), 500
-                continue
-                
-    except Exception as e:
-        logger.error(f"❌ General API error: {str(e)}")
-        return jsonify({
-            "status": "error",
-            "message": f"Internal server error: {str(e)}"
-        }), 500
-
-@app.route('/health')
-def health():
-    """Health check endpoint"""
-    return jsonify({
-        "status": "healthy",
-        "message": "Enhanced Affiliate Bot is running! 🤖",
-        "services": {
-            "bot_token_set": bool(config.BOT_TOKEN and config.BOT_TOKEN != 'YOUR_BOT_TOKEN_HERE'),
-            "channels_configured": len(config.CHANNEL_IDS) > 0,
-            "affiliate_tag_set": bool(config.AFFILIATE_TAG)
-        }
-    })
+try:
+    amazon_processor = AmazonProcessor(Config.AFFILIATE_TAG)
+    duplicate_detector = DuplicateDetector()
+    channel_poster = ChannelPoster(Config.TELEGRAM_BOT_TOKEN, Config.OUTPUT_CHANNELS)
+    logger.info("✅ All services initialized successfully")
+except Exception as e:
+    logger.error(f"❌ Service initialization failed: {e}")
+    raise
 
 @app.route('/')
 def home():
-    """Dashboard home page"""
-    stats = {
-        "processed_links": len(duplicate_detector.processed_links),
-        "channels_configured": len(config.CHANNEL_IDS),
-        "affiliate_tag": config.AFFILIATE_TAG
-    }
-    return render_template('index.html', stats=stats)
+    """Home page"""
+    return """
+    <h1>🤖 Amazon Link Processor Bot</h1>
+    <p><strong>Status:</strong> <span style="color: green;">✅ Online</span></p>
+    
+    <h2>🔧 Configuration</h2>
+    <ul>
+        <li><strong>Affiliate Tag:</strong> {}</li>
+        <li><strong>Output Channels:</strong> {} channel(s)</li>
+        <li><strong>Duplicate Detection:</strong> ✅ Enabled</li>
+    </ul>
+    
+    <h2>📡 API Endpoints</h2>
+    <ul>
+        <li><code>POST /api/process</code> - Process Amazon links</li>
+        <li><code>GET /api/health</code> - Health check</li>
+    </ul>
+    
+    <h2>📊 Recent Activity</h2>
+    <p>Processed URLs: <strong>{}</strong></p>
+    """.format(
+        Config.AFFILIATE_TAG,
+        len(Config.OUTPUT_CHANNELS),
+        len(duplicate_detector.processed_urls)
+    )
 
-@app.route('/api/stats')
-def get_stats():
-    """Get processing statistics"""
+@app.route('/api/health')
+def health_check():
+    """Health check endpoint"""
     return jsonify({
-        "processed_links_count": len(duplicate_detector.processed_links),
-        "channels_configured": len(config.CHANNEL_IDS),
-        "duplicate_detection_active": True
+        'status': 'healthy',
+        'services': {
+            'amazon_processor': 'online',
+            'duplicate_detector': 'online',
+            'channel_poster': 'online'
+        }
     })
 
+@app.route('/api/process', methods=['POST'])
+def process_amazon_link():
+    """Process Amazon link and post to channels"""
+    try:
+        # Get request data
+        data = request.get_json()
+        if not data:
+            return jsonify({'status': 'error', 'message': 'No JSON data provided'}), 400
+        
+        url = data.get('url')
+        original_text = data.get('original_text', '')
+        images = data.get('images', [])
+        channel_info = data.get('channel_info', {})
+        
+        if not url:
+            return jsonify({'status': 'error', 'message': 'URL is required'}), 400
+        
+        logger.info(f"🔗 Processing request for URL: {url}")
+        logger.info(f"📸 Images received: {len(images)}")
+        
+        # Check for duplicates
+        if duplicate_detector.is_duplicate(url):
+            logger.info(f"🔄 Duplicate URL detected: {url}")
+            return jsonify({
+                'status': 'duplicate',
+                'message': 'URL already processed',
+                'url': url
+            })
+        
+        # Mark as processed
+        duplicate_detector.mark_processed(url)
+        
+        # Process Amazon link with retry logic
+        max_attempts = 3
+        product_info = None
+        
+        for attempt in range(max_attempts):
+            try:
+                product_info = amazon_processor.process_link(url)
+                if product_info:
+                    break
+                else:
+                    logger.warning(f"❌ Attempt {attempt + 1} failed for {url}: No product info returned")
+            except Exception as e:
+                logger.error(f"❌ Attempt {attempt + 1} failed for {url}: {e}")
+                if attempt == max_attempts - 1:
+                    return jsonify({
+                        'status': 'error',
+                        'message': f'Failed to process link after {max_attempts} attempts',
+                        'url': url
+                    }), 500
+        
+        if not product_info:
+            return jsonify({
+                'status': 'error',
+                'message': 'Failed to extract product information',
+                'url': url
+            }), 500
+        
+        # Add original text to product info
+        product_info['original_text'] = original_text
+        
+        # Post to channels with retry logic
+        max_attempts = 2
+        posting_result = None
+        
+        for attempt in range(max_attempts):
+            try:
+                posting_result = channel_poster.post_to_channels(product_info, images)
+                if posting_result and posting_result.get('success'):
+                    break
+                else:
+                    logger.error(f"❌ Attempt {attempt + 1} failed for {url}: {posting_result.get('errors', 'Unknown error')}")
+            except Exception as e:
+                logger.error(f"❌ Attempt {attempt + 1} failed for {url}: {e}")
+                if attempt == max_attempts - 1:
+                    return jsonify({
+                        'status': 'error',
+                        'message': f'Failed to post after {max_attempts} attempts',
+                        'url': url,
+                        'errors': [str(e)]
+                    }), 500
+        
+        if not posting_result or not posting_result.get('success'):
+            return jsonify({
+                'status': 'error',
+                'message': 'Failed to post to channels',
+                'url': url,
+                'errors': posting_result.get('errors', []) if posting_result else ['Unknown posting error']
+            }), 500
+        
+        logger.info(f"✅ Successfully processed and posted: {url}")
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Link processed and posted successfully',
+            'url': product_info.get('affiliate_link', url),
+            'channels_posted': posting_result.get('posted_channels', [])
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ Unexpected error in process_amazon_link: {e}")
+        import traceback
+        logger.error(f"❌ Traceback: {traceback.format_exc()}")
+        return jsonify({
+            'status': 'error',
+            'message': f'Internal server error: {str(e)}',
+            'url': data.get('url', 'unknown') if 'data' in locals() else 'unknown'
+        }), 500
+
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get('PORT', 10000))
+    app.run(host='0.0.0.0', port=port, debug=False)
