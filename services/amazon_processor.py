@@ -1,6 +1,8 @@
 import requests
 import logging
 import re
+import time
+import random
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 from bs4 import BeautifulSoup
 from services.url_shortener import URLShortener
@@ -11,12 +13,16 @@ class AmazonProcessor:
     def __init__(self, affiliate_tag):
         self.affiliate_tag = affiliate_tag
         self.url_shortener = URLShortener()
+        self.session = requests.Session()
         logger.info(f"🏷️ Amazon Processor initialized with tag: {affiliate_tag}")
 
     def process_link(self, url):
         """Process Amazon link and return product info with affiliate tag"""
         try:
             logger.info(f"🔄 Processing Amazon link: {url}")
+            
+            # Add random delay to avoid detection
+            time.sleep(random.uniform(1, 3))
             
             # Resolve redirects and get final URL
             final_url = self._resolve_redirects(url)
@@ -48,13 +54,14 @@ class AmazonProcessor:
             return None
 
     def _resolve_redirects(self, url, max_redirects=5):
-        """Follow redirects to get final URL"""
+        """Follow redirects to get final URL with anti-detection"""
         try:
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            }
+            headers = self._get_random_headers()
             
-            response = requests.head(url, headers=headers, allow_redirects=True, timeout=10)
+            # Add delay
+            time.sleep(random.uniform(0.5, 1.5))
+            
+            response = self.session.head(url, headers=headers, allow_redirects=True, timeout=15)
             final_url = response.url
             
             logger.info(f"URL resolved: {url} -> {final_url}")
@@ -91,23 +98,43 @@ class AmazonProcessor:
             logger.error(f"Error adding affiliate tag: {e}")
             return url
 
+    def _get_random_headers(self):
+        """Get random headers to avoid detection"""
+        user_agents = [
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        ]
+        
+        return {
+            'User-Agent': random.choice(user_agents),
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9,hi;q=0.8',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Cache-Control': 'max-age=0',
+            'DNT': '1'
+        }
+
     def _extract_product_info(self, url):
-        """ENHANCED product information extraction"""
+        """ENHANCED product information extraction with anti-detection"""
         try:
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept-Language': 'en-US,en;q=0.9,hi;q=0.8',
-                'Accept-Encoding': 'gzip, deflate, br',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                'Connection': 'keep-alive',
-                'Upgrade-Insecure-Requests': '1',
-                'Sec-Fetch-Dest': 'document',
-                'Sec-Fetch-Mode': 'navigate',
-                'Sec-Fetch-Site': 'none'
-            }
+            headers = self._get_random_headers()
             
-            response = requests.get(url, headers=headers, timeout=20)
-            if response.status_code != 200:
+            # Add random delay
+            time.sleep(random.uniform(2, 4))
+            
+            response = self.session.get(url, headers=headers, timeout=25)
+            
+            if response.status_code == 503:
+                logger.warning(f"Amazon blocked request (503) for {url}")
+                return self._default_product_info()
+            elif response.status_code != 200:
                 logger.warning(f"HTTP {response.status_code} for {url}")
                 return self._default_product_info()
                 
@@ -139,13 +166,17 @@ class AmazonProcessor:
         """Enhanced title extraction with multiple selectors"""
         title_selectors = [
             '#productTitle',
+            'h1 span#productTitle',
+            'h1.a-size-large.a-spacing-none.a-color-base',
             '.product-title',
             '[data-automation-id="product-title"]',
             'h1.a-size-large',
             'h1 span',
             '.a-size-large.product-title-word-break',
             '#feature-bullets ul li span',
-            '.a-unordered-list .a-list-item'
+            '.a-unordered-list .a-list-item',
+            'h1[data-automation-id="product-title"]',
+            '.a-size-large.a-spacing-none.a-color-base.a-text-normal'
         ]
         
         for selector in title_selectors:
@@ -157,11 +188,13 @@ class AmazonProcessor:
                         # Clean title
                         clean_title = re.sub(r'\s+', ' ', title)
                         clean_title = clean_title.replace('\n', ' ').strip()
-                        if len(clean_title) > 100:
-                            clean_title = clean_title[:97] + "..."
+                        # Remove extra content
+                        clean_title = re.sub(r'\(.*?\)', '', clean_title).strip()
+                        if len(clean_title) > 80:
+                            clean_title = clean_title[:77] + "..."
                         logger.info(f"✅ Title found with selector {selector}: {clean_title}")
                         return clean_title
-            except Exception as e:
+            except Exception:
                 continue
         
         logger.warning("❌ No title found")
@@ -172,11 +205,14 @@ class AmazonProcessor:
         price_selectors = [
             '.a-price-whole',
             '.a-price .a-offscreen',
+            '.a-price-current .a-price-whole',
             '[data-automation-id="product-price"]',
             '.a-price-range',
-            '.a-price.a-text-price.a-size-medium.apexPriceToPay',
-            '.a-price-symbol + .a-price-whole',
-            '.a-price .a-price-symbol'
+            '.a-price.a-text-price.a-size-medium.apexPriceToPay .a-offscreen',
+            '.a-price .a-price-symbol',
+            'span.a-price.a-text-price.a-size-medium.apexPriceToPay',
+            '.a-price-current',
+            '#corePrice_feature_div .a-price .a-offscreen'
         ]
         
         for selector in price_selectors:
@@ -184,9 +220,12 @@ class AmazonProcessor:
                 element = soup.select_one(selector)
                 if element:
                     price_text = element.get_text().strip()
-                    if price_text and ('₹' in price_text or 'Rs' in price_text or price_text.isdigit()):
-                        logger.info(f"✅ Price found: {price_text}")
-                        return price_text
+                    if price_text and ('₹' in price_text or 'Rs' in price_text or any(char.isdigit() for char in price_text)):
+                        # Clean price
+                        clean_price = re.sub(r'[^\d₹Rs.,\-\s]', '', price_text).strip()
+                        if clean_price:
+                            logger.info(f"✅ Price found: {clean_price}")
+                            return clean_price
             except Exception:
                 continue
         
@@ -201,7 +240,9 @@ class AmazonProcessor:
             '.a-dynamic-image',
             '#imgTagWrapperId img',
             '.a-carousel-col .a-carousel-card img',
-            '[data-a-dynamic-image]'
+            '[data-a-dynamic-image]',
+            '#main-image-container img',
+            '.imageThumb img'
         ]
         
         for selector in image_selectors:
@@ -209,7 +250,12 @@ class AmazonProcessor:
                 element = soup.select_one(selector)
                 if element:
                     src = element.get('src') or element.get('data-src') or element.get('data-a-dynamic-image')
-                    if src and src.startswith('http'):
+                    if src and ('amazon' in src or src.startswith('http')):
+                        # Ensure HTTPS
+                        if src.startswith('//'):
+                            src = 'https:' + src
+                        elif src.startswith('/'):
+                            src = 'https://images-na.ssl-images-amazon.com' + src
                         logger.info(f"✅ Image found: {src[:50]}...")
                         return src
             except Exception:
