@@ -51,7 +51,7 @@ def home():
     """.format(
         Config.AFFILIATE_TAG,
         len(Config.OUTPUT_CHANNELS),
-        len(duplicate_detector.processed_urls)
+        len(duplicate_detector.processed_links)  # ✅ FIXED: processed_links instead of processed_urls
     )
 
 @app.route('/api/health')
@@ -95,8 +95,8 @@ def process_amazon_link():
                 'url': url
             })
         
-        # Mark as processed
-        duplicate_detector.mark_processed(url)
+        # Mark as processed (already done in is_duplicate, but ensure it's marked)
+        duplicate_detector.mark_as_processed(url)
         
         # Process Amazon link with retry logic
         max_attempts = 3
