@@ -59,24 +59,33 @@ class ChannelPoster:
         }
 
     async def _post_to_single_channel(self, channel_id, product_info, images=None):
-        """Post to a single channel with proper image+caption formatting"""
+        """Post to a single channel with clean format"""
         try:
-            # Create message text with TinyURL (short link)
+            # Get product details
             title = product_info.get('title', 'Amazon Product')
             price = product_info.get('price', 'Price not available')
             short_link = product_info.get('short_link')  # TinyURL
+            affiliate_link = product_info.get('affiliate_link', '')
             original_text = product_info.get('original_text', '')
             
-            # Use TinyURL if available, otherwise use affiliate link
-            link_to_use = short_link if short_link else product_info.get('affiliate_link', '')
+            # USE TINY URL as primary link
+            link_to_display = short_link if short_link else affiliate_link
             
-            # Format message
-            if original_text and original_text.strip():
-                # Use original text + short link
-                message_text = f"{original_text}\n\n🔗 **Link:** {link_to_use}\n\n📝 **Note:** Copy link and always open in browser"
+            # Create CLEAN message format
+            if title and title != 'Amazon Product':
+                # Use extracted title
+                message_text = f"🛒 **{title}**\n💰 **Price:** {price}\n\n🔗 **Link:** {link_to_display}\n\n📝 **Note:** Copy link and always open in browser"
             else:
-                # Use product title + link
-                message_text = f"🛒 **{title}**\n💰 **Price:** {price}\n\n🔗 **Link:** {link_to_use}\n\n📝 **Note:** Copy link and always open in browser"
+                # Extract title from original text if available
+                if original_text and len(original_text) > 10:
+                    # Clean original text (remove extra links)
+                    clean_text = original_text.split('http')[0].strip()
+                    if clean_text:
+                        message_text = f"🛒 **{clean_text}**\n\n🔗 **Link:** {link_to_display}\n\n📝 **Note:** Copy link and always open in browser"
+                    else:
+                        message_text = f"🔗 **Link:** {link_to_display}\n\n📝 **Note:** Copy link and always open in browser"
+                else:
+                    message_text = f"🔗 **Link:** {link_to_display}\n\n📝 **Note:** Copy link and always open in browser"
             
             # Check if we have images
             if images and len(images) > 0:
