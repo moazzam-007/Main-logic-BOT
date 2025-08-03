@@ -1,6 +1,7 @@
 import logging
 import asyncio
 import threading
+import re  # ← MISSING IMPORT
 from telegram import Bot
 from telegram.error import TelegramError
 
@@ -48,6 +49,7 @@ class ChannelPoster:
                     loop.close()
             except Exception as e:
                 result['error'] = str(e)
+                logger.error(f"❌ Thread error: {e}")
         
         thread = threading.Thread(target=thread_target)
         thread.start()
