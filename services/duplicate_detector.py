@@ -11,7 +11,7 @@ class DuplicateDetector:
         self.detection_hours = detection_hours
         self.cleanup_interval = 3600  # Cleanup every hour
         self.last_cleanup = datetime.now()
-        
+
     def is_duplicate(self, url):
         """Check if URL is a duplicate within the detection window"""
         try:
@@ -39,7 +39,16 @@ class DuplicateDetector:
             logger.error(f"Error in duplicate detection for {url}: {e}")
             # If error, assume not duplicate to avoid blocking legitimate requests
             return False
-    
+
+    def mark_as_processed(self, url):
+        """Mark URL as processed (alias method for compatibility)"""
+        # This method ensures the URL is marked as processed
+        url_hash = self._generate_url_hash(url)
+        current_time = datetime.now()
+        self.processed_links[url_hash] = current_time
+        logger.info(f"✅ URL manually marked as processed: {url}")
+        return True
+
     def _generate_url_hash(self, url):
         """Generate consistent hash for URL based on product identifier"""
         try:
@@ -55,7 +64,7 @@ class DuplicateDetector:
         except Exception as e:
             logger.error(f"Error generating hash for {url}: {e}")
             return hashlib.md5(url.encode()).hexdigest()
-    
+
     def _cleanup_old_entries(self):
         """Remove old entries to prevent memory bloat"""
         try:
@@ -75,15 +84,15 @@ class DuplicateDetector:
             
             for key in old_keys:
                 del self.processed_links[key]
-            
+                
             if old_keys:
                 logger.info(f"🧹 Cleaned up {len(old_keys)} old duplicate detection entries")
-            
+                
             self.last_cleanup = current_time
             
         except Exception as e:
             logger.error(f"Error during cleanup: {e}")
-    
+
     def get_stats(self):
         """Get duplicate detection statistics"""
         return {
@@ -91,7 +100,7 @@ class DuplicateDetector:
             "detection_window_hours": self.detection_hours,
             "last_cleanup": self.last_cleanup.isoformat()
         }
-    
+
     def force_cleanup(self):
         """Force cleanup of all entries (for testing/debugging)"""
         count = len(self.processed_links)
