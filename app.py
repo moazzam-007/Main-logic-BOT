@@ -57,7 +57,6 @@ def process_amazon_link():
             try:
                 # Process Amazon link
                 result = amazon_processor.process_link(url)
-                
                 if not result:
                     raise Exception("Failed to process Amazon link")
 
@@ -78,7 +77,7 @@ def process_amazon_link():
                     logger.info(f"✅ Successfully processed and posted: {url}")
                     return jsonify({
                         "status": "success",
-                        "message": "Link processed and posted successfully",
+                        "message": "Link processed and posted successfully", 
                         "url": result.get('affiliate_link', url),
                         "channels_posted": posting_result['posted_channels']
                     }), 200
@@ -86,18 +85,19 @@ def process_amazon_link():
                     raise Exception(f"Failed to post to channels: {posting_result['error']}")
 
             except Exception as e:
-                logger.error(f"❌ Attempt {attempt + 1} failed for {url}: {str(e)}")
+                logger.error(f"❌ Attempt {attempt+1} failed for {url}: {str(e)}")
                 if attempt == max_retries - 1:
                     # Final attempt failed, notify error
                     if error_notifier and hasattr(error_notifier, 'notify_error'):
                         error_notifier.notify_error(url, str(e), original_text)
+                    
                     return jsonify({
                         "status": "error",
                         "message": f"Processing failed after {max_retries} attempts: {str(e)}",
                         "url": url
                     }), 500
                 continue
-
+                
     except Exception as e:
         logger.error(f"❌ General API error: {str(e)}")
         return jsonify({
