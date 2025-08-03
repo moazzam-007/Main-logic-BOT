@@ -1,5 +1,9 @@
 import os
 import logging
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
@@ -10,7 +14,7 @@ class Config:
         self.AFFILIATE_TAG = os.getenv('AFFILIATE_TAG', 'budgetlooks08-21')
         
         # Channel configuration - support multiple channels
-        channel_ids_str = os.getenv('CHANNEL_IDS', '')
+        channel_ids_str = os.getenv('OUTPUT_CHANNELS', '-1002763897032')
         self.CHANNEL_IDS = [
             int(channel_id.strip()) 
             for channel_id in channel_ids_str.split(',') 
@@ -40,3 +44,15 @@ class Config:
             logger.warning("⚠️ No AFFILIATE_TAG set, using default")
             
         logger.info(f"✅ Configuration loaded - {len(self.CHANNEL_IDS)} channels configured")
+
+    # Class-level properties for backward compatibility
+    @property
+    def TELEGRAM_BOT_TOKEN(self):
+        return self.BOT_TOKEN
+    
+    @property
+    def OUTPUT_CHANNELS(self):
+        return self.CHANNEL_IDS
+
+# Create instance for use
+Config = Config()
