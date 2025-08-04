@@ -1,7 +1,7 @@
 import logging
 import asyncio
-from telegram import Bot, InputMediaPhoto
-from telegram.error import TelegramError
+from aiogram import Bot
+from aiogram.utils.exceptions import TelegramAPIError
 from functools import wraps
 
 logger = logging.getLogger(__name__)
@@ -25,11 +25,10 @@ def retry_on_failure(max_retries=3, delay=5):
 
 class ChannelPoster:
     def __init__(self, bot_token, channel_ids):
-        self.bot_token = bot_token
+        self.bot = Bot(bot_token)
         self.channel_ids = channel_ids if isinstance(channel_ids, list) else [channel_ids]
         logger.info(f"📢 ChannelPoster initialized with {len(self.channel_ids)} channels")
-        self.bot = Bot(token=self.bot_token)
-        
+
     @retry_on_failure(max_retries=2, delay=3)
     async def post_to_channels_with_retry(self, product_info):
         """Post product info to all configured channels with retries"""
@@ -58,7 +57,6 @@ class ChannelPoster:
 
     async def _post_to_single_channel(self, bot, channel_id, product_info):
         """Post to a single channel with smart image and clean format"""
-        # Get product details
         title = product_info.get('title', '').strip()
         price = product_info.get('price', 'Price not available')
         short_link = product_info.get('short_link')
@@ -67,16 +65,14 @@ class ChannelPoster:
         images = product_info.get('images', [])
         image_url = product_info.get('image_url')
         
-        # Check for images from monitor bot first, then scraped images
         final_image = None
         if images and images[0].get('file_id'):
-            final_image = images[0].get('file_id') # Use the file_id from monitor bot
+            final_image = images[0].get('file_id')
         elif image_url:
-            final_image = image_url # Use the scraped image url
+            final_image = image_url
         
         link_to_display = short_link if short_link else affiliate_link
         
-        # Create CLEAN message format
         message_text = f"🛒 **{title or 'Amazon Deal'}**\n\n💰 **Price:** {price}\n\n🔗 **Link:** {link_to_display}\n\n📝 **Note:** Copy link and always open in browser"
 
         try:
@@ -95,7 +91,7 @@ class ChannelPoster:
                     disable_web_page_preview=True
                 )
             
-        except TelegramError as e:
+        except TelegramAPIError as e:
             logger.error(f"❌ Telegram error posting to {channel_id}: {e}")
             raise
         except Exception as e:
