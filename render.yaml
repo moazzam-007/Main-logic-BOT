@@ -1,16 +1,18 @@
 services:
   - type: web
-    name: enhanced-affiliate-bot
+    name: amazon-affiliate-bot
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn main:app
+    startCommand: gunicorn app:create_app --bind 0.0.0.0:$PORT
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
       - key: TELEGRAM_BOT_TOKEN
         sync: false
-      - key: CHANNEL_IDS
-        sync: false
       - key: AFFILIATE_TAG
-        value: budgetlooks08-21
+        sync: false
+      - key: OUTPUT_CHANNELS
+        sync: false
       - key: ERROR_CHAT_ID
         sync: false
       - key: TINYURL_API_TOKEN
