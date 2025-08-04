@@ -7,6 +7,7 @@ from services.amazon_processor import AmazonProcessor
 from services.channel_poster import ChannelPoster
 from services.error_notifier import ErrorNotifier
 from utils.config import Config
+from services.url_shortener import URLShortener
 
 # Setup logging
 logging.basicConfig(
@@ -22,16 +23,17 @@ app = Flask(__name__)
 try:
     amazon_processor = AmazonProcessor(Config.AFFILIATE_TAG)
     channel_poster = ChannelPoster(Config.TELEGRAM_BOT_TOKEN, Config.OUTPUT_CHANNELS)
-    error_notifier = ErrorNotifier(Config.TELEGRAM_BOT_TOKEN, Config.LOG_GROUP_ID)
+    error_notifier = ErrorNotifier(Config.TELEGRAM_BOT_TOKEN, Config.ERROR_CHAT_ID)
     logger.info("✅ All services initialized successfully")
+    
+    # Send startup notification in the background
+    @app.before_first_request
+    async def send_startup_notification():
+        await error_notifier.notify_startup()
+    
 except Exception as e:
     logger.error(f"❌ Service initialization failed: {e}")
     raise
-
-# Flask ke event loop mein startup notification bhejenge
-@app.before_first_request
-async def send_startup_notification():
-    await error_notifier.notify_startup()
 
 @app.route('/')
 def home():
@@ -77,7 +79,6 @@ async def process_amazon_link():
     url = data.get('url')
     original_text = data.get('original_text', '')
     images = data.get('images', [])
-    channel_info = data.get('channel_info', {})
 
     if not url:
         return jsonify({'status': 'error', 'message': 'URL is required'}), 400
@@ -86,7 +87,6 @@ async def process_amazon_link():
     logger.info(f"📸 Images received: {len(images)}")
     
     try:
-        # Process Amazon link with retry logic
         product_info = await amazon_processor.process_link_with_retry(url)
         
         if not product_info:
@@ -98,11 +98,9 @@ async def process_amazon_link():
                 'url': url
             }), 500
 
-        # Add original text and images to product info
         product_info['original_text'] = original_text
         product_info['images'] = images
         
-        # Post to channels with retry logic
         posting_result = await channel_poster.post_to_channels_with_retry(product_info)
         
         if not posting_result or not posting_result.get('success'):
