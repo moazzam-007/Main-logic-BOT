@@ -7,7 +7,6 @@ from services.amazon_processor import AmazonProcessor
 from services.channel_poster import ChannelPoster
 from services.error_notifier import ErrorNotifier
 from utils.config import Config
-from services.url_shortener import URLShortener
 
 # Setup logging
 logging.basicConfig(
@@ -26,11 +25,10 @@ try:
     error_notifier = ErrorNotifier(Config.TELEGRAM_BOT_TOKEN, Config.ERROR_CHAT_ID)
     logger.info("✅ All services initialized successfully")
     
-    # Send startup notification in the background
     @app.before_first_request
     async def send_startup_notification():
         await error_notifier.notify_startup()
-    
+
 except Exception as e:
     logger.error(f"❌ Service initialization failed: {e}")
     raise
@@ -79,6 +77,7 @@ async def process_amazon_link():
     url = data.get('url')
     original_text = data.get('original_text', '')
     images = data.get('images', [])
+    channel_info = data.get('channel_info', {})
 
     if not url:
         return jsonify({'status': 'error', 'message': 'URL is required'}), 400
