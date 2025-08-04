@@ -24,7 +24,6 @@ class ErrorNotifier:
         full_message = f"{message}"
         if traceback_info:
             full_message += f"\n\n```python\n{traceback_info}\n```"
-
         try:
             return await self._send_notification(full_message)
         except Exception as e:
@@ -42,14 +41,11 @@ class ErrorNotifier:
             formatted_text = original_text[:200] + '...' if len(original_text) > 200 else original_text
             
             notification_message = f"""🚨 **Enhanced Affiliate Bot Error**
-
 ⏰ **Time:** {timestamp}
 🔗 **URL:** `{url}`
 ❌ **Error:** {error_message}
-
 📝 **Original Text:**
 {formatted_text}"""
-
             if traceback_info:
                 notification_message += f"\n\n```python\n{traceback_info}\n```"
                 
@@ -66,7 +62,6 @@ class ErrorNotifier:
         
         try:
             message = f"""🚀 **Enhanced Affiliate Bot Started**
-
 ⏰ **Time:** {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 ✅ **Status:** Bot is running and ready to process links"""
             
@@ -108,7 +103,6 @@ class ErrorNotifier:
             return False
         
         test_message = f"""🧪 **Test Notification**
-
 ⏰ **Time:** {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 ✅ **Status:** Error notification system is working properly
 🤖 **Bot:** Enhanced Affiliate Bot"""
