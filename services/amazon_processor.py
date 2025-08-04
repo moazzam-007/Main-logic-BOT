@@ -49,7 +49,7 @@ class AmazonProcessor:
             product_info = await self._extract_product_info_async(affiliate_url)
             
             # Get short URL
-            short_url = self.url_shortener.shorten_url(affiliate_url)
+            short_url = await self.url_shortener.shorten_url(affiliate_url)
             
             # Combine all data
             result = {
@@ -88,7 +88,6 @@ class AmazonProcessor:
 
     def _add_affiliate_tag(self, url):
         """Add affiliate tag to Amazon URL"""
-        # ... (same as your original code)
         try:
             parsed = urlparse(url)
             query_params = parse_qs(parsed.query)
@@ -116,7 +115,6 @@ class AmazonProcessor:
 
     def _get_random_headers(self):
         """Get random headers to avoid detection"""
-        # ... (same as your original code)
         user_agents = [
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
@@ -176,7 +174,6 @@ class AmazonProcessor:
             return self._default_product_info()
 
     def _extract_title_enhanced(self, soup):
-        # ... (same as your original code)
         title_selectors = [
             '#productTitle',
             'h1 span#productTitle',
@@ -212,7 +209,6 @@ class AmazonProcessor:
         return ""
 
     def _extract_price_enhanced(self, soup):
-        # ... (same as your original code)
         price_selectors = [
             '.a-price-whole',
             '.a-price .a-offscreen',
@@ -243,7 +239,6 @@ class AmazonProcessor:
         return "Price not available"
 
     def _extract_image_enhanced(self, soup):
-        # ... (same as your original code)
         image_selectors = [
             '#landingImage',
             '[data-automation-id="product-image"] img',
@@ -274,7 +269,6 @@ class AmazonProcessor:
         return None
 
     def _default_product_info(self):
-        # ... (same as your original code)
         return {
             'title': '',
             'price': 'Price not available',
