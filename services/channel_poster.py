@@ -1,7 +1,7 @@
 import logging
 import asyncio
-from aiogram import Bot
-from aiogram.utils.exceptions import TelegramAPIError
+from telegram import Bot, InputMediaPhoto
+from telegram.error import TelegramError
 from functools import wraps
 
 logger = logging.getLogger(__name__)
@@ -91,7 +91,7 @@ class ChannelPoster:
                     disable_web_page_preview=True
                 )
             
-        except TelegramAPIError as e:
+        except TelegramError as e:
             logger.error(f"❌ Telegram error posting to {channel_id}: {e}")
             raise
         except Exception as e:
