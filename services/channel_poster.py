@@ -72,7 +72,7 @@ class ChannelPoster:
         link_to_display = short_link if short_link else affiliate_link
         
         message_text = f"🛒 **{title or 'Amazon Deal'}**\n\n💰 **Price:** {price}\n\n🔗 **Link:** {link_to_display}\n\n📝 **Note:** Copy link and always open in browser"
-
+        
         try:
             if final_image:
                 await bot.send_photo(
