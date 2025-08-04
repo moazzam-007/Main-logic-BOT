@@ -18,22 +18,20 @@ logger = logging.getLogger(__name__)
 # Initialize Flask app
 app = Flask(__name__)
 
-# Initialize services
+# Initialize services (Global scope mein)
 try:
     amazon_processor = AmazonProcessor(Config.AFFILIATE_TAG)
     channel_poster = ChannelPoster(Config.TELEGRAM_BOT_TOKEN, Config.OUTPUT_CHANNELS)
     error_notifier = ErrorNotifier(Config.TELEGRAM_BOT_TOKEN, Config.LOG_GROUP_ID)
     logger.info("✅ All services initialized successfully")
-    
-    # Send startup notification
-    async def startup_notify():
-        await error_notifier.notify_startup()
-
-    asyncio.run(startup_notify())
-    
 except Exception as e:
     logger.error(f"❌ Service initialization failed: {e}")
     raise
+
+# Flask ke event loop mein startup notification bhejenge
+@app.before_first_request
+async def send_startup_notification():
+    await error_notifier.notify_startup()
 
 @app.route('/')
 def home():
