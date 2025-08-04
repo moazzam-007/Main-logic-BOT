@@ -26,6 +26,10 @@ def create_app():
         error_notifier = ErrorNotifier(Config.TELEGRAM_BOT_TOKEN, Config.ERROR_CHAT_ID)
         logger.info("✅ All services initialized successfully")
         
+        # Debug logging for environment variables
+        logger.info(f"DEBUG: OUTPUT_CHANNELS raw value: '{os.getenv('OUTPUT_CHANNELS')}'")
+        logger.info(f"DEBUG: OUTPUT_CHANNELS parsed: {Config.OUTPUT_CHANNELS}")
+        
         # Send startup notification
         asyncio.run(error_notifier.notify_startup())
     except Exception as e:
@@ -48,6 +52,7 @@ def create_app():
         <ul>
             <li><code>POST /api/process</code> - Process Amazon links</li>
             <li><code>GET /api/health</code> - Health check</li>
+            <li><code>GET /debug</code> - Debug environment variables</li>
         </ul>
         """.format(
             Config.AFFILIATE_TAG,
@@ -64,6 +69,18 @@ def create_app():
                 'channel_poster': 'online',
                 'error_notifier': 'online'
             }
+        })
+
+    @app.route('/debug')
+    def debug():
+        """Debug endpoint to check environment variables"""
+        return jsonify({
+            'OUTPUT_CHANNELS_raw': os.getenv('OUTPUT_CHANNELS'),
+            'OUTPUT_CHANNELS_parsed': Config.OUTPUT_CHANNELS,
+            'TELEGRAM_BOT_TOKEN_set': bool(os.getenv('TELEGRAM_BOT_TOKEN')),
+            'AFFILIATE_TAG': Config.AFFILIATE_TAG,
+            'ERROR_CHAT_ID_set': bool(os.getenv('ERROR_CHAT_ID')),
+            'TINYURL_API_TOKEN_set': bool(os.getenv('TINYURL_API_TOKEN'))
         })
 
     @app.route('/api/process', methods=['POST'])
