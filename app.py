@@ -2,8 +2,8 @@ from flask import Flask, request, jsonify
 import logging
 import os
 import asyncio
+import traceback
 from services.amazon_processor import AmazonProcessor
-from services.duplicate_detector import DuplicateDetector
 from services.channel_poster import ChannelPoster
 from services.error_notifier import ErrorNotifier
 from utils.config import Config
@@ -21,17 +21,18 @@ app = Flask(__name__)
 # Initialize services
 try:
     amazon_processor = AmazonProcessor(Config.AFFILIATE_TAG)
-    # Duplicate detector ab sirf memory-based hoga, monitor bot mein
-    # isliye yahan iski zaroorat nahi hai.
-    # Lekin code mein logic hai, isliye hum isko rehne dete hain.
-    duplicate_detector = DuplicateDetector()
     channel_poster = ChannelPoster(Config.TELEGRAM_BOT_TOKEN, Config.OUTPUT_CHANNELS)
     error_notifier = ErrorNotifier(Config.TELEGRAM_BOT_TOKEN, Config.LOG_GROUP_ID)
     logger.info("✅ All services initialized successfully")
+    
+    # Send startup notification
+    async def startup_notify():
+        await error_notifier.notify_startup()
+
+    asyncio.run(startup_notify())
+    
 except Exception as e:
     logger.error(f"❌ Service initialization failed: {e}")
-    # Error notifier ko is point par initialize nahi kiya ja sakta
-    # isliye hum seedha raise kar denge
     raise
 
 @app.route('/')
@@ -44,7 +45,7 @@ def home():
     <ul>
         <li><strong>Affiliate Tag:</strong> {}</li>
         <li><strong>Output Channels:</strong> {} channel(s)</li>
-        <li><strong>Duplicate Detection:</strong> ✅ Enabled (on Monitor Bot)</li>
+        <li><strong>Duplicate Detection:</strong> ✅ Handled by Monitor Bot</li>
     </ul>
     <h2>📡 API Endpoints</h2>
     <ul>
@@ -63,8 +64,8 @@ def health_check():
         'status': 'healthy',
         'services': {
             'amazon_processor': 'online',
-            'duplicate_detector': 'online',
-            'channel_poster': 'online'
+            'channel_poster': 'online',
+            'error_notifier': 'online'
         }
     })
 
@@ -86,9 +87,6 @@ async def process_amazon_link():
     logger.info(f"🔗 Processing request for URL: {url}")
     logger.info(f"📸 Images received: {len(images)}")
     
-    # Duplicate check ko Monitor Bot par transfer kar diya hai
-    # Isliye yahan sirf process karenge
-    
     try:
         # Process Amazon link with retry logic
         product_info = await amazon_processor.process_link_with_retry(url)
@@ -104,7 +102,7 @@ async def process_amazon_link():
 
         # Add original text and images to product info
         product_info['original_text'] = original_text
-        product_info['images'] = images # Monitor bot se aayi images
+        product_info['images'] = images
         
         # Post to channels with retry logic
         posting_result = await channel_poster.post_to_channels_with_retry(product_info)
@@ -119,6 +117,8 @@ async def process_amazon_link():
             }), 500
 
         logger.info(f"✅ Successfully processed and posted: {url}")
+        
+        await error_notifier.notify(f"✅ New link processed and posted successfully for URL: {url}")
 
         return jsonify({
             'status': 'success',
