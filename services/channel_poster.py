@@ -1,12 +1,11 @@
 import logging
 import asyncio
-from telegram import Bot, InputMediaPhoto
+from telegram import Bot
 from telegram.error import TelegramError
 from functools import wraps
 
 logger = logging.getLogger(__name__)
 
-# Retry decorator for async functions
 def retry_on_failure(max_retries=3, delay=5):
     def decorator(func):
         @wraps(func)
@@ -41,7 +40,6 @@ class ChannelPoster:
                 posted_channels.append(channel_id)
                 logger.info(f"✅ Posted to channel: {channel_id}")
                 
-                # Small async delay between posts
                 await asyncio.sleep(0.5)
                 
             except Exception as e:
