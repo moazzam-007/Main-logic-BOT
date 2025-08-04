@@ -25,24 +25,19 @@ class Config:
     
     # TinyURL API (if needed)
     TINYURL_API_TOKEN = os.getenv('TINYURL_API_TOKEN')
-    
-    _validate_config()
 
-    @staticmethod
-    def _validate_config():
-        """Validate essential configuration"""
-        if not Config.TELEGRAM_BOT_TOKEN:
-            logger.error("❌ TELEGRAM_BOT_TOKEN not set")
-            raise ValueError("TELEGRAM_BOT_TOKEN not set")
-        
-        if not Config.OUTPUT_CHANNELS:
-            logger.warning("⚠️ No OUTPUT_CHANNELS configured")
-        
-        if not Config.AFFILIATE_TAG:
-            logger.warning("⚠️ No AFFILIATE_TAG set, using default")
-
-# Ensure config is validated at startup
+# Class-level properties for backward compatibility
 try:
-    Config._validate_config()
-except ValueError:
+    if not Config.TELEGRAM_BOT_TOKEN:
+        logger.error("❌ TELEGRAM_BOT_TOKEN not set")
+        raise ValueError("TELEGRAM_BOT_TOKEN not set")
+    
+    if not Config.OUTPUT_CHANNELS:
+        logger.warning("⚠️ No OUTPUT_CHANNELS configured")
+    
+    if not Config.AFFILIATE_TAG:
+        logger.warning("⚠️ No AFFILIATE_TAG set, using default")
+        
+except ValueError as e:
+    # Handle the error gracefully if needed
     pass
