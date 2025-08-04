@@ -24,10 +24,11 @@ try:
     channel_poster = ChannelPoster(Config.TELEGRAM_BOT_TOKEN, Config.OUTPUT_CHANNELS)
     error_notifier = ErrorNotifier(Config.TELEGRAM_BOT_TOKEN, Config.ERROR_CHAT_ID)
     logger.info("✅ All services initialized successfully")
-    
+
+    # Flask ke event loop mein startup notification bhejenge
     @app.before_first_request
-    async def send_startup_notification():
-        await error_notifier.notify_startup()
+    def send_startup_notification():
+        asyncio.run(error_notifier.notify_startup())
 
 except Exception as e:
     logger.error(f"❌ Service initialization failed: {e}")
@@ -68,7 +69,7 @@ def health_check():
     })
 
 @app.route('/api/process', methods=['POST'])
-async def process_amazon_link():
+def process_amazon_link():
     """Process Amazon link and post to channels"""
     data = request.get_json()
     if not data:
@@ -77,34 +78,36 @@ async def process_amazon_link():
     url = data.get('url')
     original_text = data.get('original_text', '')
     images = data.get('images', [])
-    channel_info = data.get('channel_info', {})
 
     if not url:
         return jsonify({'status': 'error', 'message': 'URL is required'}), 400
 
     logger.info(f"🔗 Processing request for URL: {url}")
     logger.info(f"📸 Images received: {len(images)}")
-    
+
     try:
-        product_info = await amazon_processor.process_link_with_retry(url)
-        
+        # Process Amazon link with retry logic
+        product_info = asyncio.run(amazon_processor.process_link_with_retry(url))
+
         if not product_info:
             error_message = f"❌ Failed to extract product information for {url}"
-            await error_notifier.notify(error_message)
+            asyncio.run(error_notifier.notify(error_message))
             return jsonify({
                 'status': 'error',
                 'message': 'Failed to extract product information',
                 'url': url
             }), 500
 
+        # Add original text and images to product info
         product_info['original_text'] = original_text
         product_info['images'] = images
-        
-        posting_result = await channel_poster.post_to_channels_with_retry(product_info)
-        
+
+        # Post to channels with retry logic
+        posting_result = asyncio.run(channel_poster.post_to_channels_with_retry(product_info))
+
         if not posting_result or not posting_result.get('success'):
             error_message = f"❌ Failed to post to channels for {url}: {posting_result.get('errors', 'Unknown error')}"
-            await error_notifier.notify(error_message)
+            asyncio.run(error_notifier.notify(error_message))
             return jsonify({
                 'status': 'error',
                 'message': 'Failed to post to channels',
@@ -112,8 +115,8 @@ async def process_amazon_link():
             }), 500
 
         logger.info(f"✅ Successfully processed and posted: {url}")
-        
-        await error_notifier.notify(f"✅ New link processed and posted successfully for URL: {url}")
+
+        asyncio.run(error_notifier.notify(f"✅ New link processed and posted successfully for URL: {url}"))
 
         return jsonify({
             'status': 'success',
@@ -124,7 +127,7 @@ async def process_amazon_link():
 
     except Exception as e:
         error_message = f"❌ Unexpected error in process_amazon_link: {e}"
-        await error_notifier.notify(error_message, traceback_info=traceback.format_exc())
+        asyncio.run(error_notifier.notify(error_message, traceback_info=traceback.format_exc()))
         return jsonify({
             'status': 'error',
             'message': f'Internal server error: {str(e)}',
