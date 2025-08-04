@@ -1,6 +1,8 @@
-import requests
+import aiohttp
 import logging
+import asyncio
 from datetime import datetime
+import traceback
 
 logger = logging.getLogger(__name__)
 
@@ -13,8 +15,23 @@ class ErrorNotifier:
         
         if not self.enabled:
             logger.warning("⚠️ Error notifications disabled - missing bot token or error chat ID")
-    
-    def notify_error(self, url, error_message, original_text=""):
+            
+    async def notify(self, message, traceback_info=None):
+        """Send a general notification to the configured chat"""
+        if not self.enabled:
+            return False
+            
+        full_message = f"{message}"
+        if traceback_info:
+            full_message += f"\n\n```python\n{traceback_info}\n```"
+
+        try:
+            return await self._send_notification(full_message)
+        except Exception as e:
+            logger.error(f"Error sending general notification: {e}")
+            return False
+
+    async def notify_error(self, url, error_message, original_text="", traceback_info=None):
         """Send error notification to configured chat"""
         if not self.enabled:
             return False
@@ -22,7 +39,6 @@ class ErrorNotifier:
         try:
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             
-            # Format original text first
             formatted_text = original_text[:200] + '...' if len(original_text) > 200 else original_text
             
             notification_message = f"""🚨 **Enhanced Affiliate Bot Error**
@@ -31,18 +47,19 @@ class ErrorNotifier:
 🔗 **URL:** `{url}`
 ❌ **Error:** {error_message}
 
-📝 **Original Text:** 
-{formatted_text}
+📝 **Original Text:**
+{formatted_text}"""
 
-🔧 **Action Required:** Please check the logs and resolve the issue."""
-            
-            return self._send_notification(notification_message)
+            if traceback_info:
+                notification_message += f"\n\n```python\n{traceback_info}\n```"
+                
+            return await self._send_notification(notification_message)
             
         except Exception as e:
-            logger.error(f"Error sending error notification: {e}")
+            logger.error(f"Error sending specific error notification: {e}")
             return False
     
-    def notify_startup(self):
+    async def notify_startup(self):
         """Send startup notification"""
         if not self.enabled:
             return False
@@ -51,54 +68,15 @@ class ErrorNotifier:
             message = f"""🚀 **Enhanced Affiliate Bot Started**
 
 ⏰ **Time:** {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
-✅ **Status:** Bot is running and ready to process links
-🔧 **Services:** All services initialized successfully"""
+✅ **Status:** Bot is running and ready to process links"""
             
-            return self._send_notification(message)
+            return await self._send_notification(message)
             
         except Exception as e:
             logger.error(f"Error sending startup notification: {e}")
             return False
-    
-    def notify_channel_failure(self, channel_id, error_message):
-        """Notify about channel posting failures"""
-        if not self.enabled:
-            return False
-        
-        try:
-            message = f"""📺 **Channel Posting Error**
-
-⏰ **Time:** {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
-📺 **Channel ID:** `{channel_id}`
-❌ **Error:** {error_message}
-
-🔧 **Suggestion:** Check channel permissions and bot access."""
             
-            return self._send_notification(message)
-            
-        except Exception as e:
-            logger.error(f"Error sending channel failure notification: {e}")
-            return False
-    
-    def notify_duplicate_detection_cleanup(self, cleaned_count):
-        """Notify about duplicate detection cleanup"""
-        if not self.enabled or cleaned_count == 0:
-            return False
-        
-        try:
-            message = f"""🧹 **Duplicate Detection Cleanup**
-
-⏰ **Time:** {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
-📊 **Cleaned Entries:** {cleaned_count}
-✅ **Status:** Memory cleanup completed successfully"""
-            
-            return self._send_notification(message)
-            
-        except Exception as e:
-            logger.error(f"Error sending cleanup notification: {e}")
-            return False
-    
-    def _send_notification(self, message):
+    async def _send_notification(self, message):
         """Send notification message to Telegram"""
         try:
             url = f"{self.telegram_api_url}/sendMessage"
@@ -108,21 +86,22 @@ class ErrorNotifier:
                 'parse_mode': 'Markdown'
             }
             
-            response = requests.post(url, json=data, timeout=15)
-            response.raise_for_status()
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, json=data, timeout=15) as response:
+                    response.raise_for_status()
+                    
+                    if response.status == 200:
+                        logger.info("✅ Error notification sent successfully")
+                        return True
+                    else:
+                        logger.error(f"Failed to send notification: {response.status}")
+                        return False
             
-            if response.status_code == 200:
-                logger.info("✅ Error notification sent successfully")
-                return True
-            else:
-                logger.error(f"Failed to send notification: {response.status_code}")
-                return False
-                
-        except requests.exceptions.RequestException as e:
+        except (aiohttp.ClientError, asyncio.TimeoutError, Exception) as e:
             logger.error(f"Error sending notification: {e}")
             return False
-    
-    def test_notification(self):
+
+    async def test_notification(self):
         """Send test notification"""
         if not self.enabled:
             logger.warning("Error notifications are disabled")
@@ -134,4 +113,4 @@ class ErrorNotifier:
 ✅ **Status:** Error notification system is working properly
 🤖 **Bot:** Enhanced Affiliate Bot"""
         
-        return self._send_notification(test_message)
+        return await self._send_notification(test_message)
