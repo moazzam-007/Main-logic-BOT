@@ -26,10 +26,15 @@ def create_app():
     # Initialize services
     try:
         amazon_processor = AmazonProcessor(Config.AFFILIATE_TAG)
-        channel_poster = ChannelPoster(Config.TELEGRAM_BOT_TOKEN, Config.OUTPUT_CHANNELS)
+        # === CHANGE KIYA GAYA HAI (1) ===
+        # Ab hum ChannelPoster ko poora bot object de rahe hain, token nahi.
+        channel_poster = ChannelPoster(bot, Config.OUTPUT_CHANNELS)
         error_notifier = ErrorNotifier(Config.TELEGRAM_BOT_TOKEN, Config.ERROR_CHAT_ID)
         logger.info("✅ All services initialized successfully")
-        asyncio.run(error_notifier.notify_startup())
+        
+        # Startup notification ko alag thread mein bhejte hain taake startup block na ho
+        threading.Thread(target=lambda: asyncio.run(error_notifier.notify_startup())).start()
+        
     except Exception as e:
         logger.error(f"❌ Service initialization failed: {e}")
         raise
@@ -60,7 +65,10 @@ def create_app():
             product_info['original_text'] = payload.get('original_text', '')
             product_info['images'] = payload.get('images', [])
             
-            posting_result = await channel_poster.post_to_channels_with_retry(product_info)
+            # === CHANGE KIYA GAYA HAI (2) ===
+            # Function ka naam theek kar diya gaya hai aur 'await' hata diya gaya hai
+            posting_result = channel_poster.post_to_channels(product_info)
+            
             if not posting_result or not posting_result.get('success'):
                 error_message = f"❌ Failed to post to channels for {url}: {posting_result.get('errors', 'Unknown error')}"
                 await error_notifier.notify(error_message)
