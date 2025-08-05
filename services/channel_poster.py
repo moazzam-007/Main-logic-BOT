@@ -1,4 +1,4 @@
-# services/channel_poster.py (Updated Code)
+# services/channel_poster.py (FINAL UPDATED CODE)
 import logging
 import time
 
@@ -6,7 +6,7 @@ logger = logging.getLogger(__name__)
 
 class ChannelPoster:
     def __init__(self, bot, channel_ids):
-        self.bot = bot  # Hum telebot ka instance direct istemal karenge
+        self.bot = bot
         self.channel_ids = channel_ids if isinstance(channel_ids, list) else [channel_ids]
         logger.info(f"📢 ChannelPoster initialized with {len(self.channel_ids)} channels")
 
@@ -37,15 +37,23 @@ class ChannelPoster:
         title = product_info.get('title', '').strip()
         price = product_info.get('price', 'Price not available')
         link_to_display = product_info.get('short_link') or product_info.get('affiliate_link', '')
-        image = product_info.get('images', [{}])[0].get('file_id') or product_info.get('image_url')
+        
+        # === YEH LOGIC THEEK KI GAYI HAI ===
+        # Ab yeh khali 'images' list ko safely handle karega
+        images = product_info.get('images', [])
+        image_file_id = images[0].get('file_id') if images else None
+        scraped_image_url = product_info.get('image_url')
+        
+        final_image = image_file_id or scraped_image_url
+        # ====================================
 
         message_text = f"🛒 *{title or 'Amazon Deal'}*\n\n💰 *Price:* {price}\n\n🔗 *Link:* {link_to_display}\n\n📝 *Note:* Copy link and always open in browser"
         
         try:
-            if image:
+            if final_image:
                 self.bot.send_photo(
                     chat_id=channel_id,
-                    photo=image,
+                    photo=final_image,
                     caption=message_text,
                     parse_mode='Markdown'
                 )
@@ -58,4 +66,4 @@ class ChannelPoster:
                 )
         except Exception as e:
             logger.error(f"❌ Telegram error posting to {channel_id}: {e}")
-            raise # Error ko aage bhejein taake retry ho sake
+            raise
