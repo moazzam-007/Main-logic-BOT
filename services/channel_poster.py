@@ -1,4 +1,4 @@
-# services/channel_poster.py (FINAL UPDATED CODE)
+# services/channel_poster.py (FINAL VERSION)
 import logging
 import time
 
@@ -33,22 +33,40 @@ class ChannelPoster:
         }
 
     def _post_to_single_channel(self, channel_id, product_info):
-        """Post to a single channel"""
-        title = product_info.get('title', '').strip()
+        """Post to a single channel with smart image and clean format"""
+        # Sab data nikal lein
+        scraped_title = product_info.get('title', '').strip()
         price = product_info.get('price', 'Price not available')
         link_to_display = product_info.get('short_link') or product_info.get('affiliate_link', '')
+        original_text = product_info.get('original_text', '').strip()
         
-        # === YEH LOGIC THEEK KI GAYI HAI ===
-        # Ab yeh khali 'images' list ko safely handle karega
+        # Image ki logic: pehle monitor bot wali, phir scraped
         images = product_info.get('images', [])
         image_file_id = images[0].get('file_id') if images else None
         scraped_image_url = product_info.get('image_url')
-        
         final_image = image_file_id or scraped_image_url
-        # ====================================
 
-        message_text = f"🛒 *{title or 'Amazon Deal'}*\n\n💰 *Price:* {price}\n\n🔗 *Link:* {link_to_display}\n\n📝 *Note:* Copy link and always open in browser"
+        # Title ki logic: pehle scraped, phir original text
+        final_title = scraped_title
+        if not final_title:
+            # URL ko original text se hata dein taake saaf title mile
+            clean_original_text = original_text.split('http')[0].strip()
+            if clean_original_text:
+                final_title = clean_original_text
+            else:
+                final_title = "Amazon Deal" # Aakhri fallback
+
+        # Message banayein
+        message_text = f"🛒 *{final_title}*\n\n"
         
+        # Price ki line sirf tab add karein jab price mili ho
+        if price and price != 'Price not available':
+            message_text += f"💰 *Price:* {price}\n\n"
+            
+        message_text += f"🔗 *Link:* {link_to_display}\n\n"
+        message_text += "📝 *Note:* Copy link and always open in browser"
+        
+        # Post karein
         try:
             if final_image:
                 self.bot.send_photo(
