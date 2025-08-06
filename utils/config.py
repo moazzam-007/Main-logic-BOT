@@ -2,9 +2,7 @@ import os
 import logging
 from dotenv import load_dotenv
 
-# Load environment variables
 load_dotenv()
-
 logger = logging.getLogger(__name__)
 
 class Config:
@@ -12,13 +10,13 @@ class Config:
     TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
     AFFILIATE_TAG = os.getenv('AFFILIATE_TAG', 'budgetlooks08-21')
     
+    # Naye variables
+    WEBHOOK_URL = os.getenv('WEBHOOK_URL') # Aapke Render app ka URL
+    TELEGRAM_SECRET_TOKEN = os.getenv('TELEGRAM_SECRET_TOKEN') # Security ke liye ek secret password
+
     # Output Channel configuration
     output_channels_str = os.getenv('OUTPUT_CHANNELS', '')
-    OUTPUT_CHANNELS = [
-        int(channel_id.strip())
-        for channel_id in output_channels_str.split(',')
-        if channel_id.strip()
-    ] if output_channels_str else []
+    OUTPUT_CHANNELS = [int(ch.strip()) for ch in output_channels_str.split(',') if ch.strip()] if output_channels_str else []
     
     # Error notification chat
     ERROR_CHAT_ID = os.getenv('ERROR_CHAT_ID')
@@ -26,13 +24,12 @@ class Config:
     # TinyURL API (if needed)
     TINYURL_API_TOKEN = os.getenv('TINYURL_API_TOKEN')
 
-# Validate configuration
-if not Config.TELEGRAM_BOT_TOKEN:
-    logger.error("❌ TELEGRAM_BOT_TOKEN not set")
-    raise ValueError("TELEGRAM_BOT_TOKEN not set")
+# Validation
+required_vars = ["TELEGRAM_BOT_TOKEN", "WEBHOOK_URL", "OUTPUT_CHANNELS"]
+missing_vars = [var for var in required_vars if not getattr(Config, var)]
+if missing_vars:
+    error_msg = f"❌ Missing required environment variables: {', '.join(missing_vars)}"
+    logger.error(error_msg)
+    raise ValueError(error_msg)
 
-if not Config.OUTPUT_CHANNELS:
-    logger.warning("⚠️ No OUTPUT_CHANNELS configured")
-
-if not Config.AFFILIATE_TAG:
-    logger.warning("⚠️ No AFFILIATE_TAG set, using default")
+logger.info("✅ All required environment variables are set")
