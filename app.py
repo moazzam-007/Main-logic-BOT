@@ -1,4 +1,4 @@
-# app.py (THE ABSOLUTE FINAL VERSION)
+# app.py (FINAL CORRECTED VERSION)
 import os
 import logging
 import asyncio
@@ -9,7 +9,7 @@ from queue import Queue
 import time
 import telebot
 
-# Apke existing services aur config
+# Your existing services and config
 from services.amazon_processor import AmazonProcessor
 from services.channel_poster import ChannelPoster
 from services.error_notifier import ErrorNotifier
@@ -18,15 +18,19 @@ from utils.config import Config
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Global queue taake sab ise access kar sakein
+# Global queue so all parts of the app can access it
 task_queue = Queue()
+
+# Global services that the worker will use
+amazon_processor = None
+channel_poster = None
+error_notifier = None
 
 def create_app():
     app = Flask(__name__)
     bot = telebot.TeleBot(Config.TELEGRAM_BOT_TOKEN, threaded=False)
     
-    # Global services taake worker unhe istemal kar sake
-    # 'global' keyword ka istemal zaroori hai
+    # Use the 'global' keyword to modify the global service variables
     global amazon_processor, channel_poster, error_notifier
     
     try:
@@ -48,19 +52,19 @@ def create_app():
         logger.info(f"✅ Request for URL {data.get('url')} added to queue. Queue size: {task_queue.qsize()}")
         return jsonify({'status': 'success', 'message': 'Request queued for processing.'}), 202
 
-    # Webhook aur baaki routes
+    # Webhook and other routes
     @app.route("/")
     def webhook():
         bot.remove_webhook()
         url = f'https://main-logic-bot-ditc.onrender.com/{Config.TELEGRAM_BOT_TOKEN}' 
         bot.set_webhook(url=url)
         return "<h1>✅ Bot is live and webhook is set!</h1>", 200
-
-    # (Yahan aap apne /start, /health jaise routes add kar sakte hain)
+        
+    # (You can add your other routes like /start, /health here if you want)
 
     return app
 
-# --- Worker Logic (Ab yeh create_app ke bahar hai) ---
+# --- Worker Logic (This is outside the factory) ---
 async def process_and_post_task(payload, url):
     try:
         product_info = await amazon_processor.process_link_with_retry(url)
@@ -93,12 +97,12 @@ def queue_worker():
         except Exception as e:
             logger.error(f"❌ Error in queue_worker: {e}", exc_info=True)
 
-# --- Thread Ko Yahan Start Karein ---
-# Gunicorn is file ko load karte waqt is hisse ko chalayega
+# --- App and Thread Initialization (This is outside the factory) ---
+
+# This creates the Flask app instance that Gunicorn will look for
+app = create_app()
+
+# This starts the background worker thread
 worker_thread = threading.Thread(target=queue_worker, daemon=True)
 worker_thread.start()
 logger.info("✅ Queue worker thread initiated globally.")
-
-# --- App Ko Yahan Banayein ---
-# Yeh Gunicorn ke liye zaroori hai
-app = create_app()
