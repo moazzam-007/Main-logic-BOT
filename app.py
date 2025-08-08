@@ -1,4 +1,4 @@
-# app.py (FINAL-FINAL-CORRECTED VERSION)
+# app.py (FINAL-FINAL-BEST-VERSION)
 import os
 import logging
 import asyncio
@@ -17,13 +17,14 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger(__name__)
 
 processing_lock = Lock()
+# Duplicate detector ko global banayein taake sabhi threads ise istemal kar sakein
 duplicate_detector = DuplicateDetector(detection_hours=48)
 
 def create_app():
     app = Flask(__name__)
     bot = telebot.TeleBot(Config.TELEGRAM_BOT_TOKEN, threaded=False)
     
-    # Global services taake worker unhe use kar sake
+    # Services ko global scope mein initialize karein
     global amazon_processor, channel_poster, error_notifier
     amazon_processor = AmazonProcessor(Config.AFFILIATE_TAG)
     channel_poster = ChannelPoster(bot, Config.OUTPUT_CHANNELS)
@@ -52,11 +53,7 @@ def create_app():
     def sync_task_wrapper(payload):
         """Async task ko lock ke saath ek alag thread mein chalata hai"""
         url = payload.get('url')
-        clean_url = url.split('?')[0]
         
-        # Mark as processed immediately to handle race conditions
-        duplicate_detector.mark_as_processed(clean_url)
-
         logger.info(f"⏳ Waiting to acquire lock for URL: {url}")
         with processing_lock:
             logger.info(f"✅ Lock acquired. Processing URL: {url}")
@@ -73,15 +70,20 @@ def create_app():
         if not data or not url:
             return jsonify({'status': 'error', 'message': 'URL is required'}), 400
         
-        clean_url = url.split('?')[0]
-        if duplicate_detector.is_duplicate(clean_url):
+        # === BEHTAR DUPLICATE CHECK LOGIC ===
+        # Link ko queue mein daalne se pehle check karein
+        if duplicate_detector.is_duplicate(url):
             logger.info(f"🔄 Duplicate link received by Logic Bot. Rejecting: {url}")
             return jsonify({'status': 'duplicate', 'message': 'URL already processed recently.'}), 200
+
+        # Agar link naya hai, to use foran "processed" mark karein
+        duplicate_detector.mark_as_processed(url)
         
+        # Ab process karne ke liye background thread start karein
         threading.Thread(target=sync_task_wrapper, args=(data,)).start()
         return jsonify({'status': 'success', 'message': 'Request received. Processing will start shortly.'}), 202
     
-    # === WEBHOOK LOGIC WAPAS ADD KI GAYI HAI ===
+    # === WEBHOOK LOGIC ===
     @bot.message_handler(commands=['start', 'help'])
     def send_welcome(message):
         bot.reply_to(message, "Welcome! This is the Logic Bot.")
@@ -99,6 +101,5 @@ def create_app():
         url = f'{Config.WEBHOOK_URL}/{Config.TELEGRAM_BOT_TOKEN}'
         bot.set_webhook(url=url, secret_token=Config.TELEGRAM_SECRET_TOKEN)
         return "<h1>✅ Bot is live and webhook is set!</h1>"
-    # ===============================================
     
     return app
